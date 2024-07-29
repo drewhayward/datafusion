@@ -35,7 +35,6 @@ use tokio::fs::File;
 
 use datafusion::datasource::streaming::StreamingTable;
 use datafusion::datasource::{MemTable, TableProvider};
-use datafusion::execution::context::SessionState;
 use datafusion::execution::disk_manager::DiskManagerConfig;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::execution::session_state::SessionStateBuilder;
@@ -45,6 +44,7 @@ use datafusion::physical_plan::{ExecutionPlan, SendableRecordBatchStream};
 use datafusion_common::{assert_contains, Result};
 
 use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion_catalog::Session;
 use datafusion_execution::TaskContext;
 use test_utils::AccessLogGenerator;
 
@@ -164,7 +164,7 @@ async fn cross_join() {
 }
 
 #[tokio::test]
-async fn merge_join() {
+async fn sort_merge_join_no_spill() {
     // Planner chooses MergeJoin only if number of partitions > 1
     let config = SessionConfig::new()
         .with_target_partitions(2)
@@ -175,11 +175,32 @@ async fn merge_join() {
             "select t1.* from t t1 JOIN t t2 ON t1.pod = t2.pod AND t1.time = t2.time",
         )
         .with_expected_errors(vec![
-            "Resources exhausted: Failed to allocate additional",
+            "Failed to allocate additional",
             "SMJStream",
+            "Disk spilling disabled",
         ])
         .with_memory_limit(1_000)
         .with_config(config)
+        .with_scenario(Scenario::AccessLogStreaming)
+        .run()
+        .await
+}
+
+#[tokio::test]
+async fn sort_merge_join_spill() {
+    // Planner chooses MergeJoin only if number of partitions > 1
+    let config = SessionConfig::new()
+        .with_target_partitions(2)
+        .set_bool("datafusion.optimizer.prefer_hash_join", false);
+
+    TestCase::new()
+        .with_query(
+            "select t1.* from t t1 JOIN t t2 ON t1.pod = t2.pod AND t1.time = t2.time",
+        )
+        .with_memory_limit(1_000)
+        .with_config(config)
+        .with_disk_manager_config(DiskManagerConfig::NewOs)
+        .with_scenario(Scenario::AccessLogStreaming)
         .run()
         .await
 }
@@ -222,17 +243,18 @@ async fn sort_preserving_merge() {
             // SortPreservingMergeExec (not a Sort which would compete
             // with the SortPreservingMergeExec for memory)
             &[
-                "+---------------+-------------------------------------------------------------------------------------------------------------+",
-                "| plan_type     | plan                                                                                                        |",
-                "+---------------+-------------------------------------------------------------------------------------------------------------+",
-                "| logical_plan  | Limit: skip=0, fetch=10                                                                                     |",
-                "|               |   Sort: t.a ASC NULLS LAST, t.b ASC NULLS LAST, fetch=10                                                    |",
-                "|               |     TableScan: t projection=[a, b]                                                                          |",
-                "| physical_plan | GlobalLimitExec: skip=0, fetch=10                                                                           |",
-                "|               |   SortPreservingMergeExec: [a@0 ASC NULLS LAST,b@1 ASC NULLS LAST], fetch=10                                |",
-                "|               |     MemoryExec: partitions=2, partition_sizes=[5, 5], output_ordering=a@0 ASC NULLS LAST,b@1 ASC NULLS LAST |",
-                "|               |                                                                                                             |",
-                "+---------------+-------------------------------------------------------------------------------------------------------------+",
+                "+---------------+---------------------------------------------------------------------------------------------------------------+",
+                "| plan_type     | plan                                                                                                          |",
+                "+---------------+---------------------------------------------------------------------------------------------------------------+",
+                "| logical_plan  | Limit: skip=0, fetch=10                                                                                       |",
+                "|               |   Sort: t.a ASC NULLS LAST, t.b ASC NULLS LAST, fetch=10                                                      |",
+                "|               |     TableScan: t projection=[a, b]                                                                            |",
+                "| physical_plan | GlobalLimitExec: skip=0, fetch=10                                                                             |",
+                "|               |   SortPreservingMergeExec: [a@0 ASC NULLS LAST,b@1 ASC NULLS LAST], fetch=10                                  |",
+                "|               |     LocalLimitExec: fetch=10                                                                                  |",
+                "|               |       MemoryExec: partitions=2, partition_sizes=[5, 5], output_ordering=a@0 ASC NULLS LAST,b@1 ASC NULLS LAST |",
+                "|               |                                                                                                               |",
+                "+---------------+---------------------------------------------------------------------------------------------------------------+",
             ]
         )
         .run()
@@ -259,7 +281,7 @@ async fn sort_spill_reservation() {
         .with_query("select * from t ORDER BY a , b DESC")
     // enough memory to sort if we don't try to merge it all at once
         .with_memory_limit(partition_size)
-    // use a single partiton so only a sort is needed
+    // use a single partition so only a sort is needed
         .with_scenario(scenario)
         .with_disk_manager_config(DiskManagerConfig::NewOs)
         .with_expected_plan(
@@ -361,7 +383,7 @@ struct TestCase {
     /// How should the disk manager (that allows spilling) be
     /// configured? Defaults to `Disabled`
     disk_manager_config: DiskManagerConfig,
-    /// Expected explain plan, if non emptry
+    /// Expected explain plan, if non-empty
     expected_plan: Vec<String>,
     /// Is the plan expected to pass? Defaults to false
     expected_success: bool,
@@ -453,7 +475,7 @@ impl TestCase {
         let table = scenario.table();
 
         let rt_config = RuntimeConfig::new()
-            // do not allow spilling
+            // disk manager setting controls the spilling
             .with_disk_manager(disk_manager_config)
             .with_memory_limit(memory_limit, MEMORY_FRACTION);
 
@@ -771,7 +793,7 @@ impl TableProvider for SortedTableProvider {
 
     async fn scan(
         &self,
-        _state: &SessionState,
+        _state: &dyn Session,
         projection: Option<&Vec<usize>>,
         _filters: &[Expr],
         _limit: Option<usize>,

@@ -534,7 +534,6 @@ impl serde::Serialize for AggregateFunction {
         let variant = match self {
             Self::Min => "MIN",
             Self::Max => "MAX",
-            Self::ArrayAgg => "ARRAY_AGG",
         };
         serializer.serialize_str(variant)
     }
@@ -548,7 +547,6 @@ impl<'de> serde::Deserialize<'de> for AggregateFunction {
         const FIELDS: &[&str] = &[
             "MIN",
             "MAX",
-            "ARRAY_AGG",
         ];
 
         struct GeneratedVisitor;
@@ -591,7 +589,6 @@ impl<'de> serde::Deserialize<'de> for AggregateFunction {
                 match value {
                     "MIN" => Ok(AggregateFunction::Min),
                     "MAX" => Ok(AggregateFunction::Max),
-                    "ARRAY_AGG" => Ok(AggregateFunction::ArrayAgg),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -3605,6 +3602,9 @@ impl serde::Serialize for CsvScanExecNode {
         if !self.quote.is_empty() {
             len += 1;
         }
+        if self.newlines_in_values {
+            len += 1;
+        }
         if self.optional_escape.is_some() {
             len += 1;
         }
@@ -3623,6 +3623,9 @@ impl serde::Serialize for CsvScanExecNode {
         }
         if !self.quote.is_empty() {
             struct_ser.serialize_field("quote", &self.quote)?;
+        }
+        if self.newlines_in_values {
+            struct_ser.serialize_field("newlinesInValues", &self.newlines_in_values)?;
         }
         if let Some(v) = self.optional_escape.as_ref() {
             match v {
@@ -3654,6 +3657,8 @@ impl<'de> serde::Deserialize<'de> for CsvScanExecNode {
             "hasHeader",
             "delimiter",
             "quote",
+            "newlines_in_values",
+            "newlinesInValues",
             "escape",
             "comment",
         ];
@@ -3664,6 +3669,7 @@ impl<'de> serde::Deserialize<'de> for CsvScanExecNode {
             HasHeader,
             Delimiter,
             Quote,
+            NewlinesInValues,
             Escape,
             Comment,
         }
@@ -3691,6 +3697,7 @@ impl<'de> serde::Deserialize<'de> for CsvScanExecNode {
                             "hasHeader" | "has_header" => Ok(GeneratedField::HasHeader),
                             "delimiter" => Ok(GeneratedField::Delimiter),
                             "quote" => Ok(GeneratedField::Quote),
+                            "newlinesInValues" | "newlines_in_values" => Ok(GeneratedField::NewlinesInValues),
                             "escape" => Ok(GeneratedField::Escape),
                             "comment" => Ok(GeneratedField::Comment),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -3716,6 +3723,7 @@ impl<'de> serde::Deserialize<'de> for CsvScanExecNode {
                 let mut has_header__ = None;
                 let mut delimiter__ = None;
                 let mut quote__ = None;
+                let mut newlines_in_values__ = None;
                 let mut optional_escape__ = None;
                 let mut optional_comment__ = None;
                 while let Some(k) = map_.next_key()? {
@@ -3744,6 +3752,12 @@ impl<'de> serde::Deserialize<'de> for CsvScanExecNode {
                             }
                             quote__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::NewlinesInValues => {
+                            if newlines_in_values__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("newlinesInValues"));
+                            }
+                            newlines_in_values__ = Some(map_.next_value()?);
+                        }
                         GeneratedField::Escape => {
                             if optional_escape__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("escape"));
@@ -3763,6 +3777,7 @@ impl<'de> serde::Deserialize<'de> for CsvScanExecNode {
                     has_header: has_header__.unwrap_or_default(),
                     delimiter: delimiter__.unwrap_or_default(),
                     quote: quote__.unwrap_or_default(),
+                    newlines_in_values: newlines_in_values__.unwrap_or_default(),
                     optional_escape: optional_escape__,
                     optional_comment: optional_comment__,
                 })
@@ -9016,6 +9031,9 @@ impl serde::Serialize for ListingTableScanNode {
                 listing_table_scan_node::FileFormatType::Avro(v) => {
                     struct_ser.serialize_field("avro", v)?;
                 }
+                listing_table_scan_node::FileFormatType::Json(v) => {
+                    struct_ser.serialize_field("json", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -9047,6 +9065,7 @@ impl<'de> serde::Deserialize<'de> for ListingTableScanNode {
             "csv",
             "parquet",
             "avro",
+            "json",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -9064,6 +9083,7 @@ impl<'de> serde::Deserialize<'de> for ListingTableScanNode {
             Csv,
             Parquet,
             Avro,
+            Json,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -9098,6 +9118,7 @@ impl<'de> serde::Deserialize<'de> for ListingTableScanNode {
                             "csv" => Ok(GeneratedField::Csv),
                             "parquet" => Ok(GeneratedField::Parquet),
                             "avro" => Ok(GeneratedField::Avro),
+                            "json" => Ok(GeneratedField::Json),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -9211,6 +9232,13 @@ impl<'de> serde::Deserialize<'de> for ListingTableScanNode {
                                 return Err(serde::de::Error::duplicate_field("avro"));
                             }
                             file_format_type__ = map_.next_value::<::std::option::Option<_>>()?.map(listing_table_scan_node::FileFormatType::Avro)
+;
+                        }
+                        GeneratedField::Json => {
+                            if file_format_type__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("json"));
+                            }
+                            file_format_type__ = map_.next_value::<::std::option::Option<_>>()?.map(listing_table_scan_node::FileFormatType::Json)
 ;
                         }
                     }

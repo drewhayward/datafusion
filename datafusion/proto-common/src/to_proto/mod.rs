@@ -30,7 +30,8 @@ use arrow::datatypes::{
 use arrow::ipc::writer::{DictionaryTracker, IpcDataGenerator};
 use datafusion_common::{
     config::{
-        ColumnOptions, CsvOptions, JsonOptions, ParquetOptions, TableParquetOptions,
+        CsvOptions, JsonOptions, ParquetColumnOptions, ParquetOptions,
+        TableParquetOptions,
     },
     file_options::{csv_writer::CsvWriterOptions, json_writer::JsonWriterOptions},
     parsers::CompressionTypeVariant,
@@ -191,9 +192,10 @@ impl TryFrom<&DataType> for protobuf::arrow_type::ArrowTypeEnum {
                 precision: *precision as u32,
                 scale: *scale as i32,
             }),
-            DataType::Decimal256(_, _) => {
-                return Err(Error::General("Proto serialization error: The Decimal256 data type is not yet supported".to_owned()))
-            }
+            DataType::Decimal256(precision, scale) => Self::Decimal256(protobuf::Decimal256Type {
+                precision: *precision as u32,
+                scale: *scale as i32,
+            }),
             DataType::Map(field, sorted) => {
                 Self::Map(Box::new(
                     protobuf::Map {
@@ -829,10 +831,12 @@ impl TryFrom<&ParquetOptions> for protobuf::ParquetOptions {
     }
 }
 
-impl TryFrom<&ColumnOptions> for protobuf::ColumnOptions {
+impl TryFrom<&ParquetColumnOptions> for protobuf::ColumnOptions {
     type Error = DataFusionError;
 
-    fn try_from(value: &ColumnOptions) -> datafusion_common::Result<Self, Self::Error> {
+    fn try_from(
+        value: &ParquetColumnOptions,
+    ) -> datafusion_common::Result<Self, Self::Error> {
         Ok(protobuf::ColumnOptions {
             compression_opt: value
                 .compression
@@ -900,6 +904,9 @@ impl TryFrom<&CsvOptions> for protobuf::CsvOptions {
             quote: vec![opts.quote],
             escape: opts.escape.map_or_else(Vec::new, |e| vec![e]),
             double_quote: opts.double_quote.map_or_else(Vec::new, |h| vec![h as u8]),
+            newlines_in_values: opts
+                .newlines_in_values
+                .map_or_else(Vec::new, |h| vec![h as u8]),
             compression: compression.into(),
             schema_infer_max_rec: opts.schema_infer_max_rec as u64,
             date_format: opts.date_format.clone().unwrap_or_default(),

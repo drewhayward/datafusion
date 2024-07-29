@@ -90,6 +90,7 @@ message ListingTableScanNode {
     datafusion_common.CsvFormat csv = 10;
     datafusion_common.ParquetFormat parquet = 11;
     datafusion_common.AvroFormat avro = 12;
+    datafusion_common.NdJsonFormat json = 15;
   }
   repeated LogicalExprNodeCollection file_sort_order = 13;
 }
@@ -472,7 +473,7 @@ enum AggregateFunction {
   // AVG = 3;
   // COUNT = 4;
   // APPROX_DISTINCT = 5;
-  ARRAY_AGG = 6;
+  // ARRAY_AGG = 6;
   // VARIANCE = 7;
   // VARIANCE_POP = 8;
   // COVARIANCE = 9;
@@ -1007,6 +1008,7 @@ message CsvScanExecNode {
   oneof optional_comment {
     string comment = 6;
   }
+  bool newlines_in_values = 7;
 }
 
 message AvroScanExecNode {

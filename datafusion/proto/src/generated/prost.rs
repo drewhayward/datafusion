@@ -118,7 +118,7 @@ pub struct ListingTableScanNode {
     pub target_partitions: u32,
     #[prost(message, repeated, tag = "13")]
     pub file_sort_order: ::prost::alloc::vec::Vec<LogicalExprNodeCollection>,
-    #[prost(oneof = "listing_table_scan_node::FileFormatType", tags = "10, 11, 12")]
+    #[prost(oneof = "listing_table_scan_node::FileFormatType", tags = "10, 11, 12, 15")]
     pub file_format_type: ::core::option::Option<
         listing_table_scan_node::FileFormatType,
     >,
@@ -134,6 +134,8 @@ pub mod listing_table_scan_node {
         Parquet(super::super::datafusion_common::ParquetFormat),
         #[prost(message, tag = "12")]
         Avro(super::super::datafusion_common::AvroFormat),
+        #[prost(message, tag = "15")]
+        Json(super::super::datafusion_common::NdJsonFormat),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -1542,6 +1544,8 @@ pub struct CsvScanExecNode {
     pub delimiter: ::prost::alloc::string::String,
     #[prost(string, tag = "4")]
     pub quote: ::prost::alloc::string::String,
+    #[prost(bool, tag = "7")]
+    pub newlines_in_values: bool,
     #[prost(oneof = "csv_scan_exec_node::OptionalEscape", tags = "5")]
     pub optional_escape: ::core::option::Option<csv_scan_exec_node::OptionalEscape>,
     #[prost(oneof = "csv_scan_exec_node::OptionalComment", tags = "6")]
@@ -1939,12 +1943,11 @@ pub struct PartitionStats {
 #[repr(i32)]
 pub enum AggregateFunction {
     Min = 0,
-    Max = 1,
     /// SUM = 2;
     /// AVG = 3;
     /// COUNT = 4;
     /// APPROX_DISTINCT = 5;
-    ///
+    /// ARRAY_AGG = 6;
     /// VARIANCE = 7;
     /// VARIANCE_POP = 8;
     /// COVARIANCE = 9;
@@ -1973,7 +1976,7 @@ pub enum AggregateFunction {
     /// REGR_SXY = 34;
     /// STRING_AGG = 35;
     /// NTH_VALUE_AGG = 36;
-    ArrayAgg = 6,
+    Max = 1,
 }
 impl AggregateFunction {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -1984,7 +1987,6 @@ impl AggregateFunction {
         match self {
             AggregateFunction::Min => "MIN",
             AggregateFunction::Max => "MAX",
-            AggregateFunction::ArrayAgg => "ARRAY_AGG",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -1992,7 +1994,6 @@ impl AggregateFunction {
         match value {
             "MIN" => Some(Self::Min),
             "MAX" => Some(Self::Max),
-            "ARRAY_AGG" => Some(Self::ArrayAgg),
             _ => None,
         }
     }

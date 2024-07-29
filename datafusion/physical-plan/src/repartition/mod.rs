@@ -415,7 +415,7 @@ struct RepartitionMetrics {
     /// Time in nanos to execute child operator and fetch batches
     fetch_time: metrics::Time,
     /// Time in nanos to perform repartitioning
-    repartition_time: metrics::Time,
+    repart_time: metrics::Time,
     /// Time in nanos for sending resulting batches to channels.
     ///
     /// One metric per output partition.
@@ -449,7 +449,7 @@ impl RepartitionMetrics {
 
         Self {
             fetch_time,
-            repartition_time: repart_time,
+            repart_time,
             send_time,
         }
     }
@@ -775,7 +775,7 @@ impl RepartitionExec {
         context: Arc<TaskContext>,
     ) -> Result<()> {
         let mut partitioner =
-            BatchPartitioner::try_new(partitioning, metrics.repartition_time.clone())?;
+            BatchPartitioner::try_new(partitioning, metrics.repart_time.clone())?;
 
         // execute the child operator
         let timer = metrics.fetch_time.timer();
@@ -1345,8 +1345,8 @@ mod tests {
 
     #[tokio::test]
     // As the hash results might be different on different platforms or
-    // wiht different compilers, we will compare the same execution with
-    // and without droping the output stream.
+    // with different compilers, we will compare the same execution with
+    // and without dropping the output stream.
     async fn hash_repartition_with_dropping_output_stream() {
         let task_ctx = Arc::new(TaskContext::default());
         let partitioning = Partitioning::Hash(
@@ -1357,7 +1357,7 @@ mod tests {
             2,
         );
 
-        // We first collect the results without droping the output stream.
+        // We first collect the results without dropping the output stream.
         let input = Arc::new(make_barrier_exec());
         let exec = RepartitionExec::try_new(
             Arc::clone(&input) as Arc<dyn ExecutionPlan>,

@@ -49,6 +49,12 @@ pub struct ParquetFormat {
 pub struct AvroFormat {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct NdJsonFormat {
+    #[prost(message, optional, tag = "1")]
+    pub options: ::core::option::Option<JsonOptions>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PrimaryKeyConstraint {
     #[prost(uint64, repeated, tag = "1")]
     pub indices: ::prost::alloc::vec::Vec<u64>,
@@ -133,6 +139,14 @@ pub struct Timestamp {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Decimal {
+    #[prost(uint32, tag = "3")]
+    pub precision: u32,
+    #[prost(int32, tag = "4")]
+    pub scale: i32,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Decimal256Type {
     #[prost(uint32, tag = "3")]
     pub precision: u32,
     #[prost(int32, tag = "4")]
@@ -446,7 +460,7 @@ pub struct Decimal256 {
 pub struct ArrowType {
     #[prost(
         oneof = "arrow_type::ArrowTypeEnum",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 35, 32, 15, 34, 16, 31, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 35, 32, 15, 34, 16, 31, 17, 18, 19, 20, 21, 22, 23, 24, 36, 25, 26, 27, 28, 29, 30, 33"
     )]
     pub arrow_type_enum: ::core::option::Option<arrow_type::ArrowTypeEnum>,
 }
@@ -516,6 +530,8 @@ pub mod arrow_type {
         Interval(i32),
         #[prost(message, tag = "24")]
         Decimal(super::Decimal),
+        #[prost(message, tag = "36")]
+        Decimal256(super::Decimal256Type),
         #[prost(message, tag = "25")]
         List(::prost::alloc::boxed::Box<super::List>),
         #[prost(message, tag = "26")]
@@ -633,6 +649,9 @@ pub struct CsvOptions {
     /// Indicates if quotes are doubled
     #[prost(bytes = "vec", tag = "14")]
     pub double_quote: ::prost::alloc::vec::Vec<u8>,
+    /// Indicates if newlines are supported in values
+    #[prost(bytes = "vec", tag = "15")]
+    pub newlines_in_values: ::prost::alloc::vec::Vec<u8>,
 }
 /// Options controlling CSV format
 #[allow(clippy::derive_partial_eq_without_eq)]

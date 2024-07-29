@@ -30,13 +30,13 @@ use datafusion_common::{exec_err, internal_err, not_impl_err, Result, ScalarValu
 use datafusion_expr::function::{AccumulatorArgs, StateFieldsArgs};
 use datafusion_expr::utils::format_state_name;
 use datafusion_expr::{
-    Accumulator, AggregateUDF, AggregateUDFImpl, Expr, ReversedUDAF, Signature,
-    Volatility,
+    Accumulator, AggregateUDFImpl, Expr, ReversedUDAF, Signature, Volatility,
 };
 use datafusion_physical_expr_common::aggregate::merge_arrays::merge_ordered_arrays;
 use datafusion_physical_expr_common::aggregate::utils::ordering_fields;
 use datafusion_physical_expr_common::sort_expr::{
-    limited_convert_logical_sort_exprs_to_physical, LexOrdering, PhysicalSortExpr,
+    limited_convert_logical_sort_exprs_to_physical_with_dfschema, LexOrdering,
+    PhysicalSortExpr,
 };
 
 make_udaf_expr_and_func!(
@@ -52,9 +52,6 @@ make_udaf_expr_and_func!(
 #[derive(Debug)]
 pub struct NthValueAgg {
     signature: Signature,
-    /// Determines whether `N` is relative to the beginning or the end
-    /// of the aggregation. When set to `true`, then `N` is from the end.
-    reversed: bool,
 }
 
 impl NthValueAgg {
@@ -62,13 +59,7 @@ impl NthValueAgg {
     pub fn new() -> Self {
         Self {
             signature: Signature::any(2, Volatility::Immutable),
-            reversed: false,
         }
-    }
-
-    pub fn with_reversed(mut self, reversed: bool) -> Self {
-        self.reversed = reversed;
-        self
     }
 }
 
@@ -98,7 +89,7 @@ impl AggregateUDFImpl for NthValueAgg {
     fn accumulator(&self, acc_args: AccumulatorArgs) -> Result<Box<dyn Accumulator>> {
         let n = match acc_args.input_exprs[1] {
             Expr::Literal(ScalarValue::Int64(Some(value))) => {
-                if self.reversed {
+                if acc_args.is_reversed {
                     Ok(-value)
                 } else {
                     Ok(value)
@@ -111,9 +102,9 @@ impl AggregateUDFImpl for NthValueAgg {
             ),
         }?;
 
-        let ordering_req = limited_convert_logical_sort_exprs_to_physical(
+        let ordering_req = limited_convert_logical_sort_exprs_to_physical_with_dfschema(
             acc_args.sort_exprs,
-            acc_args.schema,
+            acc_args.dfschema,
         )?;
 
         let ordering_dtypes = ordering_req
@@ -133,10 +124,7 @@ impl AggregateUDFImpl for NthValueAgg {
     fn state_fields(&self, args: StateFieldsArgs) -> Result<Vec<Field>> {
         let mut fields = vec![Field::new_list(
             format_state_name(self.name(), "nth_value"),
-            // TODO: The nullability of the list element should be configurable.
-            // The hard-coded `true` should be changed once the field for
-            // nullability is added to `StateFieldArgs` struct.
-            // See: https://github.com/apache/datafusion/pull/11063
+            // See COMMENTS.md to understand why nullable is set to true
             Field::new("item", args.input_type.clone(), true),
             false,
         )];
@@ -156,9 +144,7 @@ impl AggregateUDFImpl for NthValueAgg {
     }
 
     fn reverse_expr(&self) -> ReversedUDAF {
-        ReversedUDAF::Reversed(Arc::from(AggregateUDF::from(
-            Self::new().with_reversed(!self.reversed),
-        )))
+        ReversedUDAF::Reversed(nth_value_udaf())
     }
 }
 
