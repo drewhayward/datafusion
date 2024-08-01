@@ -28,7 +28,7 @@ static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use datafusion_benchmarks::{clickbench, parquet_filter, sort, tpch};
+use datafusion_benchmarks::{clickbench, parquet_filter, sort, tpch, h2o};
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "benchmark command")]
@@ -36,6 +36,7 @@ enum Options {
     Tpch(tpch::RunOpt),
     TpchConvert(tpch::ConvertOpt),
     Clickbench(clickbench::RunOpt),
+    H2o(h2o::RunOpt),
     ParquetFilter(parquet_filter::RunOpt),
     Sort(sort::RunOpt),
 }
@@ -51,5 +52,6 @@ pub async fn main() -> Result<()> {
         Options::Clickbench(opt) => opt.run().await,
         Options::ParquetFilter(opt) => opt.run().await,
         Options::Sort(opt) => opt.run().await,
+        Options::H2o(opt) => opt.run().await,
     }
 }
