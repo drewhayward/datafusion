@@ -247,6 +247,9 @@ main() {
                 imdb)
                     run_imdb
                     ;;
+                h2o)
+                    run_h2o
+                    ;;
                 *)
                     echo "Error: unknown benchmark '$BENCHMARK' for run"
                     usage
@@ -545,6 +548,12 @@ data_h2o() {
     # - 0/1 sorted
     echo "Generating h2o test data in ${H2O_DIR}"
     docker run -it --rm -v "${H2O_DIR}":/data data_h2o:latest 1e7 1e2 0 0
+}
+
+run_h2o() {
+    H2O_DIR="${DATA_DIR}/h2o"
+
+    $CARGO_COMMAND --bin dfbench -- benchmark h2o
 }
 
 

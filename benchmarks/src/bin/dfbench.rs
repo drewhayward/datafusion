@@ -41,6 +41,7 @@ enum Options {
     Tpch(tpch::RunOpt),
     TpchConvert(tpch::ConvertOpt),
     Clickbench(clickbench::RunOpt),
+    H2o(h2o::RunOpt),
     ParquetFilter(parquet_filter::RunOpt),
     Sort(sort::RunOpt),
     Imdb(imdb::RunOpt),
@@ -58,5 +59,6 @@ pub async fn main() -> Result<()> {
         Options::ParquetFilter(opt) => opt.run().await,
         Options::Sort(opt) => opt.run().await,
         Options::Imdb(opt) => opt.run().await,
+        Options::H2o(opt) => opt.run().await,
     }
 }
