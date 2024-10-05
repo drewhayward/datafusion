@@ -78,6 +78,7 @@ sort:                   Benchmark of sorting speed
 clickbench_1:           ClickBench queries against a single parquet file
 clickbench_partitioned: ClickBench queries against a partitioned (100 files) parquet
 clickbench_extended:    ClickBench \"inspired\" queries against a single parquet (DataFusion specific)
+h2o:                    h2oai db-benchmark
 
 **********
 * Supported Configuration (Environment Variables)
@@ -169,6 +170,9 @@ main() {
                     ;;
                 imdb)
                     data_imdb
+                    ;;
+                h2o)
+                    data_h2o
                     ;;
                 *)
                     echo "Error: unknown benchmark '$BENCHMARK' for data generation"
@@ -525,6 +529,23 @@ run_imdb() {
 }
 
 
+data_h2o() {
+    # Build R container to generate h2o data
+    DOCKER_DIR="${DATAFUSION_DIR}/benchmarks/src/h2o/"
+    docker build $DOCKER_DIR -f "${DOCKER_DIR}/Dockerfile" -t data_h2o:latest
+
+    # Create data dir
+    H2O_DIR="${DATA_DIR}/h2o"
+    mkdir -p "${H2O_DIR}"
+
+    # Positional args
+    # - num rows
+    # - num unique groups
+    # - % null values
+    # - 0/1 sorted
+    echo "Generating h2o test data in ${H2O_DIR}"
+    docker run -it --rm -v "${H2O_DIR}":/data data_h2o:latest 1e7 1e2 0 0
+}
 
 
 compare_benchmarks() {
